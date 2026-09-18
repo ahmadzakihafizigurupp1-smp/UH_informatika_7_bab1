@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CBT - Ulangan Harian Informatika</title>
+  
+  <!-- CDN Scripts: React, ReactDOM, Babel, Tailwind CSS -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    /* Anti-cheat CSS Prevention */
+    body {
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+    }
+    
+    /* Scrollbar Styling */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f1f1; }
+    ::-webkit-scrollbar-thumb { background: #0891b2; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #0e7490; }
+
+    /* Custom Radio Input */
+    input[type='radio'] { accent-color: #0891b2; width: 1.25rem; height: 1.25rem; cursor: pointer; }
+    
+    /* Prevent flicker on load */
+    #root { min-height: 100vh; }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-cyan-600 to-blue-800 text-slate-800 font-sans min-h-screen" oncontextmenu="return false;">
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
+
+    const GOOGLE_SHEETS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwOWLL0cu1pH4QzA3CKLcSMJBxTFJ7YSJj5eQy_MKqtq_EQuRcgpkOy5VSedxHNX1cM/exec"; // Ganti dengan URL deployment Web App Apps Script Anda
+    const STORAGE_KEY = "cbt_INFORMATIKA_VII";
+    const EXAM_DURATION = 60 * 60; // 60 menit dalam detik
+
+    // EKSTRAKSI SOAL DARI PDF
+    const rawQuestionsData = [
+      { id: 1, type: 'mc', text: "Di bawah ini yang BUKAN merupakan fondasi dari berpikir komputasional adalah...", options: ["Dekomposisi", "Menghafal", "Algoritma", "Abstraksi"], answer: "Menghafal" },
+      { id: 2, type: 'mc', text: "Memecah masalah yang besar dan rumit menjadi bagian-bagian kecil yang lebih mudah diselesaikan disebut...", options: ["Abstraksi", "Dekomposisi", "Pengenalan Pola", "Algoritma"], answer: "Dekomposisi" },
+      { id: 3, type: 'mc', text: "Langkah-langkah berurutan dan masuk akal untuk menyelesaikan sebuah masalah disebut...", options: ["Algoritma", "Abstraksi", "Struktur Data", "Optimasi"], answer: "Algoritma" },
+      { id: 4, type: 'mc', text: "Saat melihat awan mendung gelap dan angin kencang, kita tahu sebentar lagi akan turun hujan karena pernah melihat kejadian yang sama sebelumnya. Ini adalah contoh penerapan...", options: ["Dekomposisi", "Algoritma", "Pengenalan Pola", "Representasi Data"], answer: "Pengenalan Pola" },
+      { id: 5, type: 'mc', text: "Ibu menulis daftar barang belanjaan di kertas agar tidak ada barang yang lupa dibeli saat di pasar. Daftar belanjaan ini adalah contoh sederhana dari...", options: ["Struktur data", "Dekomposisi", "Optimasi", "Algoritma"], answer: "Struktur data" },
+      { id: 7, type: 'mc', text: "Budi menggambar peta rute rumah ke sekolahnya. Ia hanya menggambar jalan dan gedung utama saja, lalu mengabaikan gambar pohon dan rumput. Budi sedang menggunakan teknik...", options: ["Abstraksi", "Algoritma", "Pengenalan Pola", "Dekomposisi"], answer: "Abstraksi" },
+      { id: 8, type: 'mc', text: "Surat yang dikirim oleh sebuah sekolah kepada orang tua siswa untuk undangan rapat pengambilan rapor disebut...", options: ["Surat Pribadi", "Surat Elektronik", "Surat Resmi", "Surat Rahasia"], answer: "Surat Resmi" },
+      { id: 9, type: 'mc', text: "Salah satu ciri utama dari surat resmi yang TIDAK ADA di surat pribadi adalah memiliki...", options: ["Isi pesan surat", "Kop surat (kepala surat)", "Tanggal penulisan surat", "Nama pengirim"], answer: "Kop surat (kepala surat)" },
+      { id: 10, type: 'mc', text: "Bahasa yang digunakan dalam menulis surat resmi kepada instansi atau lembaga sebaiknya menggunakan bahasa yang...", options: ["Santai dan gaul", "Baku dan sopan", "Singkat dan lucu", "Menggunakan bahasa daerah"], answer: "Baku dan sopan" },
+      { id: 11, type: 'mc', text: "Saat kamu menulis surat untuk sahabat lamamu yang pindah ke kota lain untuk menanyakan kabarnya, kamu sedang menulis...", options: ["Surat Elektronik resmi", "Surat Resmi", "Surat Dinas", "Surat Pribadi"], answer: "Surat Pribadi" },
+      { id: 12, type: 'mc', text: "Mengapa kita harus menyusun langkah-langkah (algoritma) dengan jelas dan berurutan dari awal sampai akhir?", options: ["Agar masalah tidak bisa diselesaikan oleh orang lain", "Agar mudah diikuti, berjalan lancar, dan tidak terjadi kesalahan", "Agar terlihat lebih panjang dan rumit", "Agar bisa dihafal"], answer: "Agar mudah diikuti, berjalan lancar, dan tidak terjadi kesalahan" },
+      { id: 14, type: 'mc', text: "Karakter atau tokoh utama yang bisa kita gerakkan dan kita beri perintah dalam aplikasi Scratch disebut...", options: ["Backdrop", "Stage", "Sprite", "Block"], answer: "Sprite" },
+      { id: 15, type: 'mc', text: "Gambar latar belakang panggung (pemandangan) yang digunakan untuk memperindah tampilan di Scratch disebut...", options: ["Sprite", "Backdrop", "Costume", "Sound"], answer: "Backdrop" },
+      { id: 16, type: 'mc', text: "Untuk membuat karakter bergerak maju sebanyak 10 langkah, kita menggunakan blok perintah...", options: ["move 10 steps", "turn 15 degrees", "say Hello", "play sound"], answer: "move 10 steps" },
+      { id: 17, type: 'mc', text: "Blok perintah dengan gambar Bendera Hijau (Green Flag) biasanya diletakkan paling atas dan berfungsi untuk...", options: ["Menghentikan semua gerakan", "Memulai program atau animasi saat diklik", "Menghapus karakter dari layar", "Mengganti warna latar belakang"], answer: "Memulai program atau animasi saat diklik" },
+      { id: 18, type: 'mc', text: "Jika kita ingin menambahkan suara atau musik seperti suara kucing (\"Meow\") pada animasi kita, kita mengambil blok dari kelompok...", options: ["Motion (Gerak)", "Looks (Tampilan)", "Sound (Suara)", "Control (Kontrol)"], answer: "Sound (Suara)" },
+      { id: 19, type: 'mc', text: "Blok perintah berbentuk huruf C yang bernama \"forever\" (selamanya) digunakan jika kita ingin...", options: ["Menjalankan sebuah perintah satu kali saja", "Menjalankan perintah terus-menerus tanpa henti", "Menghentikan suara selamanya", "Menyembunyikan tokoh selamanya"], answer: "Menjalankan perintah terus-menerus tanpa henti" },
+      { id: 21, type: 'mc', text: "Jika kamu ingin memunculkan gelembung teks bertuliskan \"Halo!\" di atas kepala karakter selama 2 detik, blok apa yang harus kamu pilih?", options: ["say \"Halo!\" for 2 seconds", "think \"Halo!\"", "move 2 steps", "wait 2 seconds"], answer: "say \"Halo!\" for 2 seconds" },
+      { id: 22, type: 'mc', text: "Tombol berbentuk segi delapan atau lingkaran berwarna Merah (Stop) di sudut kanan atas panggung Scratch berfungsi untuk...", options: ["Memulai jalannya permainan", "Mengganti gambar latar (Backdrop)", "Menghentikan secara paksa semua kode yang sedang berjalan", "Menambah karakter baru"], answer: "Menghentikan secara paksa semua kode yang sedang berjalan" },
+      { id: 23, type: 'mc', text: "Jika kita ingin membuat animasi tulisan berjalan dari ujung kanan ke ujung kiri secara berulang kali, keterampilan berpikir apa yang paling kita andalkan saat menyusun blok kodenya satu persatu?", options: ["Abstraksi", "Dekomposisi", "Merancang Algoritma", "Menghafal kode"], answer: "Merancang Algoritma" },
+      { id: 24, type: 'mc', text: "Dalam aplikasi Scratch, area kotak besar berwarna putih tempat tokoh/karakter kita tampil dan bergerak-gerak disebut dengan...", options: ["Script Area", "Stage (Panggung)", "Block Palette", "Sprite List"], answer: "Stage (Panggung)" },
+      { id: 25, type: 'mc', text: "Menggunakan fitur \"Costume\" (kostum) pada tokoh/karakter Scratch berguna untuk...", options: ["Menghapus karakter dari program", "Membuat animasi tokoh seolah-olah sedang berjalan atau berganti gaya", "Memasukkan lagu ke dalam program", "Mempercepat jalannya permainan"], answer: "Membuat animasi tokoh seolah-olah sedang berjalan atau berganti gaya" }
+    ];
+
+    // Utility: Fisher-Yates Shuffle
+    const shuffleArray = (array) => {
+      const newArr = [...array];
+      for (let i = newArr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
+      }
+      return newArr;
+    };
+
+    // --- ICON COMPONENTS ---
+    const IconClock = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+    const IconAlert = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-red-500 mb-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>;
+    const IconCheckCircle = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-green-500 mb-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+    
+    // --- MODAL COMPONENTS ---
+    const AlertModal = ({ isOpen, title, message, onConfirm, confirmText = "Mengerti" }) => {
+      if (!isOpen) return null;
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4 text-center">
+            <IconAlert />
+            <h2 className="text-xl font-bold text-gray-800 mb-2">{title}</h2>
+            <p className="text-gray-600 mb-6">{message}</p>
+            <button onClick={onConfirm} className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition">
+              {confirmText}
+            </button>
+          </div>
+        </div>
+      );
+    };
+
+    const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }) => {
+      if (!isOpen) return null;
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4 text-center">
+            <h2 className="text-xl font-bold text-gray-800 mb-2">{title}</h2>
+            <p className="text-gray-600 mb-6">{message}</p>
+            <div className="flex space-x-3">
+              <button onClick={onCancel} className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg transition">Batal</button>
+              <button onClick={onConfirm} className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-4 rounded-lg transition">Yakin & Kirim</button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // --- MAIN APP COMPONENT ---
+    const App = () => {
+      const [stage, setStage] = useState('login'); // 'login', 'resume', 'exam', 'finished'
+      const [studentData, setStudentData] = useState({ nama: '', kelas: '', tanggal: new Date().toISOString().split('T')[0] });
+      const [questions, setQuestions] = useState([]);
+      const [answers, setAnswers] = useState({});
+      const [currentQIndex, setCurrentQIndex] = useState(0);
+      const [timeLeft, setTimeLeft] = useState(EXAM_DURATION);
+      const [violations, setViolations] = useState(0);
+      const [isSubmitting, setIsSubmitting] = useState(false);
+      
+      // Modals State
+      const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', msg: '', onConfirm: null });
+      const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', msg: '', onConfirm: null, onCancel: null });
+
+      const saveProgress = useCallback((newAnswers = answers, newTimeLeft = timeLeft, newViolations = violations) => {
+        if (stage !== 'exam') return;
+        const dataToSave = {
+          studentData,
+          questions,
+          answers: newAnswers,
+          timeLeft: newTimeLeft,
+          violations: newViolations
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+      }, [stage, studentData, questions, answers, timeLeft, violations]);
+
+      useEffect(() => {
+        const savedSession = localStorage.getItem(STORAGE_KEY);
+        if (savedSession && stage === 'login') {
+          setStage('resume');
+        }
+      }, []);
+
+      useEffect(() => {
+        if (stage === 'exam' && timeLeft > 0) {
+          const timerId = setInterval(() => {
+            setTimeLeft((prev) => {
+              const newTime = prev - 1;
+              if (newTime % 5 === 0) saveProgress(answers, newTime, violations);
+              if (newTime <= 0) {
+                clearInterval(timerId);
+                handleAutoSubmit("Waktu Habis");
+                return 0;
+              }
+              return newTime;
+            });
+          }, 1000);
+          return () => clearInterval(timerId);
+        }
+      }, [stage, timeLeft, answers, violations, saveProgress]);
+
+      useEffect(() => {
+        const handleAntiCheat = () => {
+          if (stage !== 'exam') return;
+          if (document.hidden || !document.fullscreenElement) {
+            handleViolation();
+          }
+        };
+
+        const preventCopy = (e) => {
+            if(stage === 'exam') e.preventDefault();
+        };
+
+        if (stage === 'exam') {
+          document.addEventListener('visibilitychange', handleAntiCheat);
+          document.addEventListener('fullscreenchange', handleAntiCheat);
+          document.addEventListener('copy', preventCopy);
+          document.addEventListener('cut', preventCopy);
+          document.addEventListener('paste', preventCopy);
+        }
+
+        return () => {
+          document.removeEventListener('visibilitychange', handleAntiCheat);
+          document.removeEventListener('fullscreenchange', handleAntiCheat);
+          document.removeEventListener('copy', preventCopy);
+          document.removeEventListener('cut', preventCopy);
+          document.removeEventListener('paste', preventCopy);
+        };
+      }, [stage, violations]);
+
+      const handleViolation = () => {
+        const newViolations = violations + 1;
+        setViolations(newViolations);
+        saveProgress(answers, timeLeft, newViolations);
+        
+        if (newViolations === 1) {
+          setAlertModal({
+            isOpen: true,
+            title: 'Peringatan Keamanan!',
+            msg: 'Anda terdeteksi keluar dari layar ujian atau membuka tab lain. Ini adalah peringatan pertama. Jika diulangi, ujian otomatis dikumpulkan.',
+            onConfirm: () => {
+                setAlertModal({ isOpen: false });
+                if (document.documentElement.requestFullscreen) {
+                    document.documentElement.requestFullscreen().catch(err => console.log(err));
+                }
+            }
+          });
+        } else if (newViolations >= 2) {
+          handleAutoSubmit("Melakukan Pelanggaran (Keluar Tab/Layar)");
+        }
+      };
+
+      const prepareQuestions = () => {
+        const shuffledQuestions = shuffleArray(rawQuestionsData).map(q => {
+          return {
+            ...q,
+            options: q.type === 'mc' ? shuffleArray(q.options) : q.options
+          };
+        });
+        setQuestions(shuffledQuestions);
+      };
+
+      const startExam = async () => {
+        if (!studentData.nama || !studentData.kelas) {
+          alert("Harap lengkapi Nama dan Kelas!");
+          return;
+        }
+        try {
+          if (document.documentElement.requestFullscreen) {
+            await document.documentElement.requestFullscreen();
+          }
+        } catch (e) {
+          console.warn("Fullscreen rejected");
+        }
+        prepareQuestions();
+        setStage('exam');
+      };
+
+      const resumeExam = () => {
+        const savedSession = localStorage.getItem(STORAGE_KEY);
+        if (savedSession) {
+          const data = JSON.parse(savedSession);
+          setStudentData(data.studentData);
+          setQuestions(data.questions);
+          setAnswers(data.answers);
+          setTimeLeft(data.timeLeft);
+          setViolations(data.violations);
+          setStage('exam');
+          try {
+            if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+          } catch(e) {}
+        }
+      };
+
+      const resetExam = () => {
+        localStorage.removeItem(STORAGE_KEY);
+        setStage('login');
+      };
+
+      const handleAnswerSelect = (qId, optionText) => {
+        const newAnswers = { ...answers, [qId]: optionText };
+        setAnswers(newAnswers);
+        saveProgress(newAnswers, timeLeft, violations);
+      };
+
+      const evaluateExam = () => {
+        let correctCount = 0;
+        let rincianArr = [];
+
+        // Evaluasi dan susun berdasarkan ID asli agar berurutan di log
+        const sortedQuestions = [...questions].sort((a, b) => a.id - b.id);
+        
+        sortedQuestions.forEach(q => {
+          const userAns = answers[q.id];
+          if (!userAns) {
+            rincianArr.push(`Soal ${q.id}: KOSONG`);
+          } else if (userAns === q.answer) {
+            correctCount++;
+            rincianArr.push(`Soal ${q.id}: BENAR`);
+          } else {
+            rincianArr.push(`Soal ${q.id}: SALAH (Pilih: ${userAns}, Kunci: ${q.answer})`);
+          }
+        });
+
+        const score = (correctCount / questions.length) * 100;
+        const rincianStr = rincianArr.join(" | ");
+        return { score: Math.round(score), rincianStr };
+      };
+
+      const submitToServer = async (keterangan) => {
+        setIsSubmitting(true);
+        const { score, rincianStr } = evaluateExam();
+        
+        const payload = {
+          nama: studentData.nama,
+          kelas: studentData.kelas,
+          tanggal: studentData.tanggal,
+          skor: score,
+          pelanggaran: violations,
+          keterangan: keterangan,
+          rincianJawaban: rincianStr
+        };
+
+        try {
+          await fetch(GOOGLE_SHEETS_WEB_APP_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify(payload)
+          });
+        } catch (error) {
+          console.error("Gagal mengirim data", error);
+        }
+
+        localStorage.removeItem(STORAGE_KEY);
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(()=>{});
+        }
+        
+        setStage('finished');
+        setIsSubmitting(false);
+      };
+
+      const handleAutoSubmit = (alasan) => {
+        setAlertModal({ isOpen: false });
+        submitToServer(alasan);
+      };
+
+      const promptManualSubmit = () => {
+        setConfirmModal({
+          isOpen: true,
+          title: "Selesai Ujian?",
+          msg: "Pastikan semua soal telah terjawab. Anda tidak bisa mengulangi ujian setelah dikirim.",
+          onCancel: () => setConfirmModal({ isOpen: false }),
+          onConfirm: () => {
+            setConfirmModal({ isOpen: false });
+            submitToServer("Selesai Normal");
+          }
+        });
+      };
+
+      const formatTime = (seconds) => {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        if(h > 0) return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+      };
+
+      // --- RENDERERS ---
+      if (stage === 'login') {
+        return (
+          <div className="flex items-center justify-center min-h-screen p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+              <div className="text-center mb-8">
+                <h1 className="text-3xl font-extrabold text-cyan-700">INFORMATIKA</h1>
+                <p className="text-gray-500 font-medium">Ulangan Harian - Kelas VII</p>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Nama Lengkap</label>
+                  <input type="text" className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none transition" 
+                         value={studentData.nama} onChange={e => setStudentData({...studentData, nama: e.target.value})} placeholder="Masukkan nama..." />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Kelas</label>
+                  <input type="text" className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none transition" 
+                         value={studentData.kelas} onChange={e => setStudentData({...studentData, kelas: e.target.value})} placeholder="Contoh: VII A" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Tanggal Ujian</label>
+                  <input type="date" className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none transition" 
+                         value={studentData.tanggal} onChange={e => setStudentData({...studentData, tanggal: e.target.value})} />
+                </div>
+                <button onClick={startExam} className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transform transition active:scale-95 mt-4">
+                  Mulai Ujian
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      if (stage === 'resume') {
+        return (
+          <div className="flex items-center justify-center min-h-screen p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
+              <IconAlert />
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Sesi Ujian Tersimpan Ditemukan!</h2>
+              <p className="text-gray-600 mb-6">Anda memiliki progres ujian yang belum diselesaikan. Apakah Anda ingin melanjutkannya?</p>
+              <div className="space-y-3">
+                <button onClick={resumeExam} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-4 rounded-lg transition">Lanjutkan Ujian</button>
+                <button onClick={resetExam} className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-4 rounded-lg transition">Mulai Ulang (Hapus Progres)</button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      if (stage === 'finished') {
+        return (
+          <div className="flex items-center justify-center min-h-screen p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
+              <IconCheckCircle />
+              <h1 className="text-3xl font-extrabold text-green-600 mb-2">Ujian Selesai!</h1>
+              <p className="text-gray-600 mb-6">Jawaban Anda telah berhasil dikirim. Terima kasih telah mengikuti ujian ini.</p>
+              <div className="bg-gray-100 rounded-lg p-4 text-left space-y-2 mb-6">
+                <p><strong>Nama:</strong> {studentData.nama}</p>
+                <p><strong>Kelas:</strong> {studentData.kelas}</p>
+              </div>
+              <button onClick={() => window.location.reload()} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition">Tutup Aplikasi</button>
+            </div>
+          </div>
+        );
+      }
+
+      // EXAM UI
+      const currentQ = questions[currentQIndex];
+      const isLastQ = currentQIndex === questions.length - 1;
+
+      return (
+        <div className="flex flex-col h-screen overflow-hidden">
+          {/* Header */}
+          <header className="bg-white shadow-md z-10 px-6 py-4 flex justify-between items-center">
+            <div>
+              <h1 className="text-xl md:text-2xl font-extrabold text-cyan-800 tracking-tight">INFORMATIKA</h1>
+              <p className="text-sm text-gray-500 font-semibold">Ulangan Harian - Kelas VII | {studentData.nama}</p>
+            </div>
+            <div className={`flex items-center space-x-2 font-mono text-xl md:text-2xl font-bold px-4 py-2 rounded-lg border-2 ${timeLeft < 300 ? 'border-red-500 text-red-600 bg-red-50' : 'border-cyan-200 text-cyan-700 bg-cyan-50'}`}>
+              <IconClock />
+              <span>{formatTime(timeLeft)}</span>
+            </div>
+          </header>
+
+          {/* Main Content Area */}
+          <div className="flex flex-1 overflow-hidden flex-col md:flex-row bg-slate-100">
+            {/* Left/Center: Question Area */}
+            <main className="flex-1 overflow-y-auto p-4 md:p-8">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8 max-w-4xl mx-auto">
+                <div className="mb-6 flex justify-between items-center border-b pb-4">
+                  <h2 className="text-xl font-bold text-gray-800">Soal No. {currentQIndex + 1}</h2>
+                </div>
+                
+                <div className="text-lg text-gray-800 mb-8 leading-relaxed">
+                  {currentQ?.image && (
+                    <img src={currentQ.image} alt="Ilustrasi Soal" className="mb-4 max-w-full h-auto rounded-lg border shadow-sm" />
+                  )}
+                  <p>{currentQ?.text}</p>
+                </div>
+
+                <div className="space-y-3">
+                  {currentQ?.options.map((opt, i) => (
+                    <label key={i} className={`flex items-center p-4 border rounded-xl cursor-pointer transition ${answers[currentQ.id] === opt ? 'bg-cyan-50 border-cyan-500 ring-1 ring-cyan-500' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}>
+                      <input type="radio" name={`q_${currentQ.id}`} value={opt} checked={answers[currentQ.id] === opt} onChange={() => handleAnswerSelect(currentQ.id, opt)} className="mr-4" />
+                      <span className="text-gray-700 font-medium">{opt}</span>
+                    </label>
+                  ))}
+                </div>
+
+                {/* Mobile Navigation */}
+                <div className="mt-8 flex justify-between md:hidden gap-2">
+                  <button onClick={() => setCurrentQIndex(Math.max(0, currentQIndex - 1))} disabled={currentQIndex === 0} className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-4 rounded-lg disabled:opacity-50">
+                    Mundur
+                  </button>
+                  {!isLastQ ? (
+                    <button onClick={() => setCurrentQIndex(Math.min(questions.length - 1, currentQIndex + 1))} className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-4 rounded-lg">
+                      Lanjut
+                    </button>
+                  ) : (
+                    <button onClick={promptManualSubmit} className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg">
+                      Kumpulkan
+                    </button>
+                  )}
+                </div>
+              </div>
+            </main>
+
+            {/* Right/Bottom: Question Grid Navigation */}
+            <aside className="w-full md:w-80 bg-white shadow-xl md:shadow-none border-t md:border-t-0 md:border-l border-gray-200 p-6 flex flex-col">
+              <h3 className="font-bold text-gray-700 mb-4 hidden md:block">Navigasi Soal</h3>
+              <div className="grid grid-cols-5 md:grid-cols-4 gap-2 md:gap-3 overflow-y-auto mb-4">
+                {questions.map((q, idx) => {
+                  const isAnswered = !!answers[q.id];
+                  const isActive = idx === currentQIndex;
+                  return (
+                    <button key={q.id} onClick={() => setCurrentQIndex(idx)} 
+                            className={`aspect-square rounded-lg font-bold text-sm md:text-base flex items-center justify-center transition
+                            ${isActive ? 'ring-4 ring-blue-400 ring-offset-2' : ''}
+                            ${isAnswered ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'}`}>
+                      {idx + 1}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Desktop Navigation Buttons */}
+              <div className="hidden md:flex flex-col gap-3 mt-auto">
+                <div className="flex gap-2">
+                   <button onClick={() => setCurrentQIndex(Math.max(0, currentQIndex - 1))} disabled={currentQIndex === 0} className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 rounded-lg disabled:opacity-50 transition">
+                    &laquo; Prev
+                  </button>
+                  <button onClick={() => setCurrentQIndex(Math.min(questions.length - 1, currentQIndex + 1))} disabled={isLastQ} className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 rounded-lg disabled:opacity-50 transition">
+                    Next &raquo;
+                  </button>
+                </div>
+                {isLastQ && (
+                  <button onClick={promptManualSubmit} disabled={isSubmitting} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition shadow-md flex justify-center items-center">
+                    {isSubmitting ? 'Mengirim...' : 'Selesai & Kumpulkan'}
+                  </button>
+                )}
+              </div>
+            </aside>
+          </div>
+
+          {/* Render Modals Out of Layout Flow */}
+          <AlertModal isOpen={alertModal.isOpen} title={alertModal.title} message={alertModal.msg} onConfirm={alertModal.onConfirm} />
+          <ConfirmModal isOpen={confirmModal.isOpen} title={confirmModal.title} message={confirmModal.msg} onConfirm={confirmModal.onConfirm} onCancel={confirmModal.onCancel} />
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
